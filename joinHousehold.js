@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+= require('firebase-admin');
 
 if (!admin.apps.length) {
   admin.initializeApp();

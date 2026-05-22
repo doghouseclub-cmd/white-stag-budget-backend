@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+= require('firebase-admin');
 const { v4: uuidv4 } = require('uuid');
 
 // Initialize Firebase Admin (Vercel will inject credentials via environment)

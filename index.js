@@ -1,33 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+// index.js - Entry point for Vercel serverless functions
 
-const app = express();
+const app = require('./app');
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Import functions
-const { createHousehold } = require('./functions/createHousehold');
-const { joinHousehold } = require('./functions/joinHousehold');
-
-// Routes
-app.post('/api/household/create', createHousehold);
-app.post('/api/household/join', joinHousehold);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// Export for Vercel
+// For Vercel: Export the app directly
 module.exports = app;
 
-// Local development
-const PORT = process.env.PORT || 3001;
+// For local development: Run the app
 if (require.main === module) {
+  const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`White Stag Budget API running on port ${PORT}`);
   });
 }
