@@ -1,4 +1,4 @@
-# White Stag Budget Backend
+# White Stag Budget Backend 
 
 API layer for the White Stag Budget multi-tenant household budgeting app.
 
