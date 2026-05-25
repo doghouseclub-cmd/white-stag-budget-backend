@@ -1,6 +1,13 @@
-# White Stag Budget Backend 
+# White Stag Budget Backend
 
 API layer for the White Stag Budget multi-tenant household budgeting app.
+
+## Architecture
+
+- **Frontend:** Next.js (separate repo)
+- **Backend:** Node.js + Express, deployed on Vercel
+- **Database:** Supabase (PostgreSQL)
+- **Auth:** Firebase Auth (JWT verification)
 
 ## Setup
 
@@ -10,19 +17,35 @@ API layer for the White Stag Budget multi-tenant household budgeting app.
 npm install
 ```
 
-### 2. Firebase Credentials
+### 2. Environment Variables
 
-- Go to Firebase Console → Project Settings → Service Accounts
-- Generate a new private key
-- Copy the JSON and add to `.env`:
+Create a `.env` file in the project root:
 
 ```
-FIREBASE_PROJECT_ID=your-id
-FIREBASE_PRIVATE_KEY=your-key
-FIREBASE_CLIENT_EMAIL=your-email
+# Firebase Admin SDK — from Firebase Console → Project Settings → Service Accounts
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY=your-private-key
+FIREBASE_CLIENT_EMAIL=your-client-email
+
+# Supabase — from Supabase Dashboard → Settings → API Keys
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+
+PORT=3001
+NODE_ENV=development
 ```
 
-### 3. Local Development
+### 3. Database Migrations
+
+Apply the schema and RLS policies to your Supabase project:
+
+```bash
+supabase db push
+```
+
+This runs the files in `supabase/migrations/` in order.
+
+### 4. Local Development
 
 ```bash
 npm run dev
@@ -30,66 +53,53 @@ npm run dev
 
 Server runs on `http://localhost:3001`
 
-### 4. Deploy to Vercel
-
-#### Option A: Via GitHub (Recommended)
+### 5. Deploy to Vercel
 
 1. Push this repo to GitHub
-1. Go to [vercel.com](https://vercel.com)
-1. Click “New Project”
-1. Import your GitHub repo
-1. Add environment variables (same as `.env`)
-1. Deploy
+2. Import the repo in [vercel.com](https://vercel.com)
+3. Add all five environment variables in Vercel → Settings → Environment Variables
+4. Deploy — Vercel auto-deploys on every push to `main`
 
-#### Option B: Via Vercel CLI
-
-```bash
-npm install -g vercel
-vercel
-```
+---
 
 ## API Endpoints
 
-### Create Household
+All endpoints require `Authorization: Bearer <firebase-id-token>`.
 
-```
-POST /api/household/create
-Body: {
-  userId: "user123",
-  email: "alice@example.com",
-  name: "Alice",
-  householdName: "Smith Household"
-}
-Response: {
-  householdId: "...",
-  joinCode: "ABC123"
-}
-```
+### Household
 
-### Join Household
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/household/create` | Create a household (owner) |
+| `POST` | `/api/household/join` | Join via 6-char code |
+| `GET` | `/api/household` | Get household + members |
+| `GET` | `/api/household/members` | List members |
+| `POST` | `/api/household/members/remove` | Remove a member (owner only) |
+| `POST` | `/api/household/leave` | Leave household |
+| `POST` | `/api/household/settings` | Update settings (owner only) |
 
-```
-POST /api/household/join
-Body: {
-  userId: "user456",
-  email: "bob@example.com",
-  name: "Bob",
-  joinCode: "ABC123"
-}
-Response: {
-  householdId: "...",
-  householdName: "Smith Household"
-}
-```
+### Priority Stack
 
-## Firestore Security Rules
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/priority-stack/active` | Get approved active stack |
+| `GET` | `/api/priority-stack/draft` | Get draft with approval status |
+| `POST` | `/api/priority-stack/draft` | Mutate draft (add/edit/remove/reorder) |
+| `POST` | `/api/priority-stack/approve` | Approve draft; auto-promotes when all members approve |
+| `POST` | `/api/priority-stack/reset` | Reset draft back to active |
+| `GET` | `/api/priority-stack/approvals` | Detailed approval status with member names |
 
-Apply `firestore.rules` in Firebase Console → Firestore → Rules tab.
+See [`docs/household_api_spec.md`](docs/household_api_spec.md) and [`docs/PRIORITY_STACK_API_SPEC.md`](docs/priority_stack_api_spec.md) for full request/response details.
 
-## Architecture
+---
 
-- **Frontend:** Next.js (separate repo)
-- **Backend:** Node.js + Express (this repo)
-- **Database:** Firestore
-- **Auth:** Firebase Auth
-- **Hosting:** Vercel
+## Database
+
+Schema and RLS policies live in `supabase/migrations/`. Run `supabase db push` after any schema change.
+
+| Migration | Contents |
+|-----------|----------|
+| `001_initial_schema.sql` | All tables, indexes, triggers |
+| `002_rls_policies.sql` | Row Level Security policies |
+
+The backend uses the Supabase **service_role (secret) key**, which bypasses RLS. RLS policies are in place for future direct client-SDK access once the frontend migrates to Supabase Auth.

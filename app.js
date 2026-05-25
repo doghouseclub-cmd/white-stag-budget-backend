@@ -2,24 +2,24 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+// Initialize Firebase Admin before any routes are loaded (routes import lib/firebase)
+require('./lib/firebase');
+
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Import routes
 const householdRoutes = require('./routes/household');
+const priorityStackRoutes = require('./routes/priority-stack');
 
-// API Routes
 app.use('/api/household', householdRoutes);
+app.use('/api/priority-stack', priorityStackRoutes);
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
@@ -28,13 +28,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export for Vercel
 module.exports = app;
-
-// Local development
-const PORT = process.env.PORT || 3001;
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`White Stag Budget API running on port ${PORT}`);
-  });
-}
