@@ -281,7 +281,7 @@ router.post('/draft', verifyAuth, requireHousehold, async (req, res) => {
         max_balance: maxBalance ?? null,
         description: description ?? '',
         icon: icon ?? '',
-        color: color ?? '',
+        color: color ?? null,
         is_archived: false,
       });
       if (insErr) throw insErr;
@@ -350,30 +350,49 @@ router.post('/draft', verifyAuth, requireHousehold, async (req, res) => {
       if (!target) return res.status(404).json({ success: false, error: 'Category not found' });
 
       const oldOrder = target.sort_order;
-      const nonArchived = categories.filter((c) => !c.is_archived);
 
-      // Build list of {id, sort_order} changes needed
-      const changes = [];
-      if (newOrder < oldOrder) {
-        // Moving up: shift [newOrder, oldOrder) down by 1
-        nonArchived
-          .filter((c) => c.id !== categoryId && c.sort_order >= newOrder && c.sort_order < oldOrder)
-          .forEach((c) => changes.push({ id: c.id, sort_order: c.sort_order + 1 }));
-        changes.push({ id: categoryId, sort_order: newOrder });
-      } else if (newOrder > oldOrder) {
-        // Moving down: shift (oldOrder, newOrder] up by 1
-        nonArchived
-          .filter((c) => c.id !== categoryId && c.sort_order > oldOrder && c.sort_order <= newOrder)
-          .forEach((c) => changes.push({ id: c.id, sort_order: c.sort_order - 1 }));
-        changes.push({ id: categoryId, sort_order: newOrder });
-      }
+      if (newOrder !== oldOrder) {
+        const nonArchived = categories.filter((c) => !c.is_archived);
 
-      for (const change of changes) {
-        const { error: reErr } = await supabase
+        // Park target at a sentinel value to free its slot before shifting others
+        const { error: parkErr } = await supabase
           .from('priority_stack_categories')
-          .update({ sort_order: change.sort_order, updated_at: now })
-          .eq('id', change.id);
-        if (reErr) throw reErr;
+          .update({ sort_order: 99999, updated_at: now })
+          .eq('id', categoryId);
+        if (parkErr) throw parkErr;
+
+        if (newOrder < oldOrder) {
+          // Moving up: shift [newOrder, oldOrder) down by 1 — process DESC to avoid conflicts
+          const displaced = nonArchived
+            .filter((c) => c.id !== categoryId && c.sort_order >= newOrder && c.sort_order < oldOrder)
+            .sort((a, b) => b.sort_order - a.sort_order);
+          for (const c of displaced) {
+            const { error: reErr } = await supabase
+              .from('priority_stack_categories')
+              .update({ sort_order: c.sort_order + 1, updated_at: now })
+              .eq('id', c.id);
+            if (reErr) throw reErr;
+          }
+        } else {
+          // Moving down: shift (oldOrder, newOrder] up by 1 — process ASC to avoid conflicts
+          const displaced = nonArchived
+            .filter((c) => c.id !== categoryId && c.sort_order > oldOrder && c.sort_order <= newOrder)
+            .sort((a, b) => a.sort_order - b.sort_order);
+          for (const c of displaced) {
+            const { error: reErr } = await supabase
+              .from('priority_stack_categories')
+              .update({ sort_order: c.sort_order - 1, updated_at: now })
+              .eq('id', c.id);
+            if (reErr) throw reErr;
+          }
+        }
+
+        // Move target to its final position
+        const { error: finalErr } = await supabase
+          .from('priority_stack_categories')
+          .update({ sort_order: newOrder, updated_at: now })
+          .eq('id', categoryId);
+        if (finalErr) throw finalErr;
       }
     }
 
