@@ -2,9 +2,6 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// Initialize Firebase Admin before any routes are loaded (routes import lib/firebase)
-require('./lib/firebase');
-
 const app = express();
 
 app.use(cors());

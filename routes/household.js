@@ -1,17 +1,18 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const admin = require('../lib/firebase');
 const supabase = require('../lib/supabase');
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
-// Middleware: verify Firebase Auth JWT
+// Middleware: verify Supabase Auth JWT
 // ---------------------------------------------------------------------------
 const verifyAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ success: false, error: 'Unauthorized' });
   try {
-    req.user = await admin.auth().verifyIdToken(token);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ success: false, error: 'Invalid token' });
+    req.user = user;
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid token' });
@@ -26,7 +27,7 @@ const requireHousehold = async (req, res, next) => {
     const { data: user, error } = await supabase
       .from('users')
       .select('household_id, household_role')
-      .eq('id', req.user.uid)
+      .eq('id', req.user.id)
       .single();
 
     if (error || !user) {
@@ -123,7 +124,7 @@ router.post('/create', verifyAuth, async (req, res) => {
     const { data: existing } = await supabase
       .from('users')
       .select('household_id')
-      .eq('id', req.user.uid)
+      .eq('id', req.user.id)
       .maybeSingle();
 
     if (existing?.household_id) {
@@ -137,7 +138,7 @@ router.post('/create', verifyAuth, async (req, res) => {
     const { error: hErr } = await supabase.from('households').insert({
       id: householdId,
       name: trimmed,
-      created_by: req.user.uid,
+      created_by: req.user.id,
       join_code: joinCode,
       join_code_expires_at: expiresAt,
       allow_negative_balances: false,
@@ -149,9 +150,9 @@ router.post('/create', verifyAuth, async (req, res) => {
     // Upsert user row (created here on first API use)
     const { error: uErr } = await supabase.from('users').upsert(
       {
-        id: req.user.uid,
+        id: req.user.id,
         email: (req.user.email || '').toLowerCase(),
-        name: req.user.name || '',
+        name: req.user.user_metadata?.name || '',
         household_id: householdId,
         household_role: 'owner',
       },
@@ -170,7 +171,7 @@ router.post('/create', verifyAuth, async (req, res) => {
         name: trimmed,
         joinCode,
         joinCodeExpiresAt: expiresAt,
-        members: [req.user.uid],
+        members: [req.user.id],
         settings: { allowNegativeBalances: false, currency: 'USD' },
       },
       message: 'Household created. Share join code with others.',
@@ -195,7 +196,7 @@ router.post('/join', verifyAuth, async (req, res) => {
     const { data: existing } = await supabase
       .from('users')
       .select('household_id')
-      .eq('id', req.user.uid)
+      .eq('id', req.user.id)
       .maybeSingle();
 
     if (existing?.household_id) {
@@ -218,9 +219,9 @@ router.post('/join', verifyAuth, async (req, res) => {
     // Upsert user into the household
     const { error: uErr } = await supabase.from('users').upsert(
       {
-        id: req.user.uid,
+        id: req.user.id,
         email: (req.user.email || '').toLowerCase(),
-        name: req.user.name || '',
+        name: req.user.user_metadata?.name || '',
         household_id: hh.id,
         household_role: 'member',
       },
@@ -327,7 +328,7 @@ router.post('/leave', verifyAuth, requireHousehold, async (req, res) => {
     const { error } = await supabase
       .from('users')
       .update({ household_id: null, household_role: null })
-      .eq('id', req.user.uid);
+      .eq('id', req.user.id);
     if (error) throw error;
 
     res.status(200).json({ success: true, message: 'Left household.' });

@@ -1,16 +1,24 @@
-jest.mock('../lib/firebase', () => ({
-  auth: () => ({
-    verifyIdToken: jest.fn((token) => {
-      const users = {
-        'owner-token':  { uid: 'ws-ps-owner',  email: 'ps-owner@test.com',  name: 'PS Owner'  },
-        'member-token': { uid: 'ws-ps-member', email: 'ps-member@test.com', name: 'PS Member' },
-        'bare-token':   { uid: 'ws-ps-bare',   email: 'ps-bare@test.com',   name: 'Bare User' },
-      };
-      if (users[token]) return Promise.resolve(users[token]);
-      throw new Error('Firebase: invalid token');
-    }),
-  }),
-}));
+// Mock Supabase Auth — supabase.auth.getUser resolves to a test user based on token string.
+const mockUsers = {
+  'owner-token':  { id: 'ws-ps-owner',  email: 'ps-owner@test.com',  user_metadata: { name: 'PS Owner' }  },
+  'member-token': { id: 'ws-ps-member', email: 'ps-member@test.com', user_metadata: { name: 'PS Member' } },
+  'bare-token':   { id: 'ws-ps-bare',   email: 'ps-bare@test.com',   user_metadata: { name: 'Bare User' } },
+};
+
+jest.mock('../lib/supabase', () => {
+  const actual = jest.requireActual('../lib/supabase');
+  return {
+    ...actual,
+    auth: {
+      ...actual.auth,
+      getUser: jest.fn((token) => {
+        const user = mockUsers[token];
+        if (user) return Promise.resolve({ data: { user }, error: null });
+        return Promise.resolve({ data: { user: null }, error: { message: 'Invalid token' } });
+      }),
+    },
+  };
+});
 
 const request  = require('supertest');
 const app      = require('../app');

@@ -1,18 +1,25 @@
-// Mock Firebase Admin — verifyIdToken resolves to a test user based on token string.
-// Any unknown token throws, simulating an invalid Firebase JWT.
-jest.mock('../lib/firebase', () => ({
-  auth: () => ({
-    verifyIdToken: jest.fn((token) => {
-      const users = {
-        'owner-token':  { uid: 'ws-hh-owner',  email: 'hh-owner@test.com',  name: 'Test Owner'  },
-        'member-token': { uid: 'ws-hh-member', email: 'hh-member@test.com', name: 'Test Member' },
-        'free-token':   { uid: 'ws-hh-free',   email: 'hh-free@test.com',   name: 'Free User'   },
-      };
-      if (users[token]) return Promise.resolve(users[token]);
-      throw new Error('Firebase: invalid token');
-    }),
-  }),
-}));
+// Mock Supabase Auth — supabase.auth.getUser resolves to a test user based on token string.
+// Any unknown token returns an error, simulating an invalid Supabase JWT.
+const mockUsers = {
+  'owner-token':  { id: 'ws-hh-owner',  email: 'hh-owner@test.com',  user_metadata: { name: 'Test Owner' }  },
+  'member-token': { id: 'ws-hh-member', email: 'hh-member@test.com', user_metadata: { name: 'Test Member' } },
+  'free-token':   { id: 'ws-hh-free',   email: 'hh-free@test.com',   user_metadata: { name: 'Free User' }   },
+};
+
+jest.mock('../lib/supabase', () => {
+  const actual = jest.requireActual('../lib/supabase');
+  return {
+    ...actual,
+    auth: {
+      ...actual.auth,
+      getUser: jest.fn((token) => {
+        const user = mockUsers[token];
+        if (user) return Promise.resolve({ data: { user }, error: null });
+        return Promise.resolve({ data: { user: null }, error: { message: 'Invalid token' } });
+      }),
+    },
+  };
+});
 
 const request  = require('supertest');
 const app      = require('../app');

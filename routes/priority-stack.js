@@ -1,17 +1,18 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const admin = require('../lib/firebase');
 const supabase = require('../lib/supabase');
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
-// Middleware: verify Firebase Auth JWT
+// Middleware: verify Supabase Auth JWT
 // ---------------------------------------------------------------------------
 const verifyAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ success: false, error: 'Unauthorized' });
   try {
-    req.user = await admin.auth().verifyIdToken(token);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ success: false, error: 'Invalid token' });
+    req.user = user;
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid token' });
@@ -26,7 +27,7 @@ const requireHousehold = async (req, res, next) => {
     const { data: user, error } = await supabase
       .from('users')
       .select('household_id, household_role')
-      .eq('id', req.user.uid)
+      .eq('id', req.user.id)
       .single();
 
     if (error || !user) {
@@ -404,7 +405,7 @@ router.post('/draft', verifyAuth, requireHousehold, async (req, res) => {
       .from('priority_stacks')
       .update({
         version: draft.version + 1,
-        last_edited_by: req.user.uid,
+        last_edited_by: req.user.id,
         last_edited_at: now,
         updated_at: now,
         ...totals,
@@ -458,7 +459,7 @@ router.post('/approve', verifyAuth, requireHousehold, async (req, res) => {
       .from('stack_approvals')
       .select('approved')
       .eq('stack_id', draft.id)
-      .eq('user_id', req.user.uid)
+      .eq('user_id', req.user.id)
       .maybeSingle();
 
     if (existingApproval?.approved) {
@@ -469,7 +470,7 @@ router.post('/approve', verifyAuth, requireHousehold, async (req, res) => {
 
     // Record approval
     const { error: apprErr } = await supabase.from('stack_approvals').upsert(
-      { stack_id: draft.id, user_id: req.user.uid, approved: true, approved_at: now },
+      { stack_id: draft.id, user_id: req.user.id, approved: true, approved_at: now },
       { onConflict: 'stack_id,user_id' }
     );
     if (apprErr) throw apprErr;
@@ -537,7 +538,7 @@ router.post('/approve', verifyAuth, requireHousehold, async (req, res) => {
       .update({
         version: newVersion,
         promoted_at: now,
-        promoted_by: req.user.uid,
+        promoted_by: req.user.id,
         updated_at: now,
         total_amount: draft.total_amount,
         category_count: draft.category_count,
