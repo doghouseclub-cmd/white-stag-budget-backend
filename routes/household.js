@@ -116,8 +116,8 @@ router.post('/create', verifyAuth, async (req, res) => {
     const { householdName } = req.body;
     const trimmed = householdName?.trim() ?? '';
 
-    if (trimmed.length < 40 || trimmed.length > 75) {
-      return res.status(400).json({ success: false, error: 'Household name must be 40-75 characters' });
+    if (trimmed.length < 2 || trimmed.length > 75) {
+      return res.status(400).json({ success: false, error: 'Household name must be 2-75 characters' });
     }
 
     // Check user isn't already in a household
