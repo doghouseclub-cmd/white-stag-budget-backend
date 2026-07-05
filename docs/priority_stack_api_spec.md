@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Priority Stack API manages household spending priorities and approval workflows. All endpoints require Firebase authentication (Bearer token in Authorization header).
+The Priority Stack API manages household spending priorities and approval workflows. All endpoints require Supabase authentication (Bearer token in Authorization header).
 
 **Base URL**: `/api/priority-stack`
 
-**Authentication**: All endpoints require `Authorization: Bearer <idToken>` header
+**Authentication**: All endpoints require `Authorization: Bearer <supabase-jwt>` header
 
 **Response Format**: JSON with `{ success: boolean, data: {...}, error?: string }`
 
@@ -23,7 +23,7 @@ The Priority Stack API manages household spending priorities and approval workfl
 **Request**:
 ```http
 GET /api/priority-stack/active
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 ```
 
 **Response (200 OK)**:
@@ -149,7 +149,7 @@ Authorization: Bearer <idToken>
 **Request**:
 ```http
 GET /api/priority-stack/draft
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 ```
 
 **Response (200 OK)**:
@@ -236,7 +236,7 @@ Authorization: Bearer <idToken>
 ```http
 POST /api/priority-stack/draft
 Content-Type: application/json
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 
 {
   "action": "add",
@@ -257,7 +257,7 @@ Authorization: Bearer <idToken>
 ```http
 POST /api/priority-stack/draft
 Content-Type: application/json
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 
 {
   "action": "edit",
@@ -274,7 +274,7 @@ Authorization: Bearer <idToken>
 ```http
 POST /api/priority-stack/draft
 Content-Type: application/json
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 
 {
   "action": "remove",
@@ -286,7 +286,7 @@ Authorization: Bearer <idToken>
 ```http
 POST /api/priority-stack/draft
 Content-Type: application/json
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 
 {
   "action": "reorder",
@@ -341,7 +341,7 @@ Authorization: Bearer <idToken>
 **Request**:
 ```http
 POST /api/priority-stack/approve
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 ```
 
 **Response (200 OK) — Partial Approval**:
@@ -406,7 +406,7 @@ Authorization: Bearer <idToken>
 **Request**:
 ```http
 POST /api/priority-stack/reset
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 ```
 
 **Response (200 OK)**:
@@ -445,7 +445,7 @@ Authorization: Bearer <idToken>
 **Request**:
 ```http
 GET /api/priority-stack/approvals
-Authorization: Bearer <idToken>
+Authorization: Bearer <supabase-jwt>
 ```
 
 **Response (200 OK)**:
@@ -499,7 +499,7 @@ Authorization: Bearer <idToken>
 {
   id: string;                  // UUID (auto-generated on creation)
   name: string;                // 1-25 characters, unique within household
-  amount: number;              // >= 0 (or negative if allowNegativeBalances=true)
+  amount: number;              // >= 0 (or negative if allow_negative_balances=true)
   order: number;               // >= 1, unique within stack
   monthlyBudget: number;       // >= 0
   maxBalance?: number | null;  // If provided: > 0
@@ -643,24 +643,24 @@ For concurrent edits, the system uses optimistic merging:
 
 ### Performance Considerations
 
-- **No batch operations**: Each edit triggers immediate Firestore update
-- **Index on `updatedAt`**: Allows sorting by recent changes
+- **No batch operations**: Each edit triggers immediate PostgreSQL update
+- **Index on `updated_at`**: Allows sorting by recent changes
 - **History cleanup**: Consider archiving old history entries after 1+ year (future feature)
-- **Approval tracking**: Uses simple array for < 50 members; scale if needed
+- **Approval tracking**: Uses `stack_approvals` rows; scales with household membership
 
 ---
 
 ## Household Settings Impact
 
-Settings in `households/{householdId}/settings`:
+Settings in `households`:
 
 | Setting | Impact |
 |---------|--------|
-| `allowNegativeBalances` | If true, categories can have negative amounts |
+| `allow_negative_balances` | If true, categories can have negative amounts |
 | `currency` | Displayed in UI (ISO code, e.g., "USD") |
-| `spilloverMode` | Used by Income Allocation system (not Priority Stack) |
+| `spillover_mode` | Used by Income Allocation system (not Priority Stack) |
 
-The Priority Stack API validates `allowNegativeBalances` on category amount validation.
+The Priority Stack API validates `allow_negative_balances` on category amount validation.
 
 ---
 

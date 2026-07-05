@@ -2,19 +2,19 @@
 -- Migration 002: Row Level Security Policies
 -- White Stag Budget — multi-tenant isolation
 --
--- IMPORTANT — FIREBASE AUTH COMPATIBILITY:
+-- IMPORTANT — SUPABASE AUTH / BROKER-ONLY ARCHITECTURE:
 -- The backend uses the Supabase service_role (secret) key, which bypasses
--- RLS entirely. These policies protect future direct client-SDK access.
+-- RLS entirely. These policies serve as defense-in-depth for any future
+-- direct client-SDK access; the current architecture treats the backend as
+-- the mandatory broker.
 --
--- auth.uid() is a Supabase Auth function. It returns NULL when requests
--- arrive with Firebase JWTs (unless Firebase is configured as a Supabase
--- third-party auth provider). The policies are written for correctness
--- once Supabase Auth is adopted; until then, the service_role key is the
--- access path and RLS is bypassed on every backend call.
+-- auth.uid() is a Supabase Auth function and returns the authenticated
+-- user's UUID. In this migration, user IDs are still TEXT (migration 001),
+-- so policies cast auth.uid() to text. Migration 003 drops and recreates
+-- these policies without the cast once user-id columns are UUID.
 --
 -- get_my_household_id() returns UUID (households.id type) by joining
--- through public.users — it works regardless of auth provider once the
--- user row exists.
+-- through public.users.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------

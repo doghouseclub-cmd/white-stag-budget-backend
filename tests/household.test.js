@@ -1,15 +1,16 @@
 // Mock Supabase Auth — supabase.auth.getUser resolves to a test user based on token string.
 // Any unknown token returns an error, simulating an invalid Supabase JWT.
 const mockUsers = {
-  'owner-token':  { id: 'ws-hh-owner',  email: 'hh-owner@test.com',  user_metadata: { name: 'Test Owner' }  },
-  'member-token': { id: 'ws-hh-member', email: 'hh-member@test.com', user_metadata: { name: 'Test Member' } },
-  'free-token':   { id: 'ws-hh-free',   email: 'hh-free@test.com',   user_metadata: { name: 'Free User' }   },
+  'owner-token':  { id: '00000000-0000-4000-8000-0000000000a1',  email: 'hh-owner@test.com',  user_metadata: { name: 'Test Owner' }  },
+  'member-token': { id: '00000000-0000-4000-8000-0000000000a2', email: 'hh-member@test.com', user_metadata: { name: 'Test Member' } },
+  'free-token':   { id: '00000000-0000-4000-8000-0000000000a3',   email: 'hh-free@test.com',   user_metadata: { name: 'Free User' }   },
 };
 
 jest.mock('../lib/supabase', () => {
   const actual = jest.requireActual('../lib/supabase');
   return {
     ...actual,
+    from: actual.from.bind(actual),
     auth: {
       ...actual.auth,
       getUser: jest.fn((token) => {
@@ -28,9 +29,9 @@ const supabase = require('../lib/supabase');
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const OWNER_UID  = 'ws-hh-owner';
-const MEMBER_UID = 'ws-hh-member';
-const FREE_UID   = 'ws-hh-free';
+const OWNER_UID  = '00000000-0000-4000-8000-0000000000a1';
+const MEMBER_UID = '00000000-0000-4000-8000-0000000000a2';
+const FREE_UID   = '00000000-0000-4000-8000-0000000000a3';
 
 const OWNER_TOKEN  = 'owner-token';
 const MEMBER_TOKEN = 'member-token';
@@ -135,14 +136,14 @@ describe('POST /api/household/create', () => {
     await supabase.from('households').delete().eq('created_by', FREE_UID);
   });
 
-  test('returns 400 when household name is too short (< 40 chars)', async () => {
+  test('returns 400 when household name is too short (< 2 chars)', async () => {
     const res = await request(app)
       .post('/api/household/create')
       .set('Authorization', `Bearer ${FREE_TOKEN}`)
-      .send({ householdName: 'Too Short' });
+      .send({ householdName: 'A' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toMatch(/40/);
+    expect(res.body.error).toMatch(/2-75/);
   });
 
   test('returns 400 when household name is too long (> 75 chars)', async () => {

@@ -4,10 +4,12 @@ API layer for the White Stag Budget multi-tenant household budgeting app.
 
 ## Architecture
 
-- **Frontend:** Next.js (separate repo)
+- **Frontend:** Expo React Native mobile app (separate repo)
 - **Backend:** Node.js + Express, deployed on Vercel
 - **Database:** Supabase (PostgreSQL)
-- **Auth:** Firebase Auth (JWT verification)
+- **Auth:** Supabase Auth (JWT verification)
+
+The frontend never calls Supabase directly; all data access goes through the backend API. See [`docs/whitestag_budget_blueprint.md`](docs/whitestag_budget_blueprint.md) for the full design.
 
 ## Setup
 
@@ -22,11 +24,6 @@ npm install
 Create a `.env` file in the project root:
 
 ```
-# Firebase Admin SDK — from Firebase Console → Project Settings → Service Accounts
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_PRIVATE_KEY=your-private-key
-FIREBASE_CLIENT_EMAIL=your-client-email
-
 # Supabase — from Supabase Dashboard → Settings → API Keys
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_...
@@ -34,6 +31,8 @@ SUPABASE_SECRET_KEY=sb_secret_...
 PORT=3001
 NODE_ENV=development
 ```
+
+The backend verifies the Supabase JWT token sent by the mobile app and uses the Supabase service role key for all database access.
 
 ### 3. Database Migrations
 
@@ -57,14 +56,16 @@ Server runs on `http://localhost:3001`
 
 1. Push this repo to GitHub
 2. Import the repo in [vercel.com](https://vercel.com)
-3. Add all five environment variables in Vercel → Settings → Environment Variables
+3. Add the required environment variables (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `PORT`, `NODE_ENV`) in Vercel → Settings → Environment Variables
 4. Deploy — Vercel auto-deploys on every push to `main`
+
+> **Note:** Google OAuth is enabled in the Supabase Auth provider settings and used by the mobile app. No backend configuration is required for OAuth.
 
 ---
 
 ## API Endpoints
 
-All endpoints require `Authorization: Bearer <firebase-id-token>`.
+All endpoints require `Authorization: Bearer <supabase-jwt>`.
 
 ### Household
 
@@ -100,6 +101,7 @@ Schema and RLS policies live in `supabase/migrations/`. Run `supabase db push` a
 | Migration | Contents |
 |-----------|----------|
 | `001_initial_schema.sql` | All tables, indexes, triggers |
-| `002_rls_policies.sql` | Row Level Security policies |
+| `002_rls_policies.sql` | Row Level Security policies (TEXT user-id cast for Supabase Auth) |
+| `003_supabase_auth.sql` | Convert user-id columns from TEXT to UUID for Supabase Auth |
 
-The backend uses the Supabase **service_role (secret) key**, which bypasses RLS. RLS policies are in place for future direct client-SDK access once the frontend migrates to Supabase Auth.
+The backend uses the Supabase **service_role (secret) key**, which bypasses RLS. RLS policies remain in place as defense-in-depth for any future direct access.

@@ -3,14 +3,12 @@
 -- White Stag Budget — multi-tenant household budgeting
 --
 -- NOTE ON USER IDs:
--- Authentication uses Firebase Auth, not Supabase Auth. Firebase UIDs are
--- arbitrary strings (e.g. "LxZhqM6bsNO0sPbHVkXj5P3A"), not UUIDs. All
--- user-id columns are therefore TEXT. When the app migrates to Supabase
--- Auth, these can be cast to UUID and FK constraints added back.
+-- Migration 001 creates the initial schema with user-id columns as TEXT
+-- so it can be applied before the auth provider is finalized. Migration 003
+-- converts these columns to UUID when the project moves to Supabase Auth.
 --
 -- The backend uses the Supabase service_role (secret) key, which bypasses
--- RLS entirely. RLS policies in migration 002 are ready for a future
--- client-side Supabase Auth migration.
+-- RLS. RLS policies in migrations 002 and 003 are kept as defense-in-depth.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -30,7 +28,7 @@ $$;
 CREATE TABLE households (
   id                      UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   name                    VARCHAR(75)   NOT NULL,
-  created_by              TEXT          NOT NULL,   -- Firebase UID of owner
+  created_by              TEXT          NOT NULL,   -- user ID of owner (UUID after migration 003)
 
   join_code               CHAR(6)       UNIQUE,
   join_code_expires_at    TIMESTAMPTZ,
@@ -43,7 +41,7 @@ CREATE TABLE households (
   updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
   CONSTRAINT households_name_length
-    CHECK (char_length(name) BETWEEN 40 AND 75),
+    CHECK (char_length(name) BETWEEN 2 AND 75),
   CONSTRAINT households_currency_length
     CHECK (char_length(currency) = 3),
   CONSTRAINT households_spillover_mode
@@ -61,11 +59,12 @@ CREATE INDEX idx_households_join_code
 -- ============================================================================
 -- TABLE: users
 --
--- Public profile keyed on Firebase UID (TEXT). Rows are created by the
--- backend on household create/join — there is no Supabase Auth trigger.
+-- Public profile keyed on the auth provider user ID (TEXT in this migration;
+-- converted to UUID in migration 003). Rows are created by the backend on
+-- household create/join.
 -- ============================================================================
 CREATE TABLE users (
-  id             TEXT          PRIMARY KEY,   -- Firebase UID
+  id             TEXT          PRIMARY KEY,   -- auth provider user ID (UUID after migration 003)
   email          TEXT          NOT NULL UNIQUE,
   name           TEXT          NOT NULL DEFAULT '',
 
@@ -98,10 +97,10 @@ CREATE TABLE priority_stacks (
 
   -- active only
   promoted_at     TIMESTAMPTZ,
-  promoted_by     TEXT,                      -- Firebase UID
+  promoted_by     TEXT,                      -- user ID (UUID after migration 003)
 
   -- draft only
-  last_edited_by  TEXT,                      -- Firebase UID
+  last_edited_by  TEXT,                      -- user ID (UUID after migration 003)
   last_edited_at  TIMESTAMPTZ,
 
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -169,7 +168,7 @@ CREATE TRIGGER categories_updated_at
 CREATE TABLE stack_approvals (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   stack_id    UUID        NOT NULL REFERENCES priority_stacks(id) ON DELETE CASCADE,
-  user_id     TEXT        NOT NULL,              -- Firebase UID
+  user_id     TEXT        NOT NULL,              -- user ID (UUID after migration 003)
   approved    BOOLEAN     NOT NULL DEFAULT FALSE,
   approved_at TIMESTAMPTZ,
 
@@ -191,7 +190,7 @@ CREATE TABLE transactions (
   description    TEXT,
 
   is_unlocked    BOOLEAN       NOT NULL DEFAULT FALSE,
-  unlocked_by    TEXT,                           -- Firebase UID
+  unlocked_by    TEXT,                           -- user ID (UUID after migration 003)
   unlocked_at    TIMESTAMPTZ,
 
   transaction_at TIMESTAMPTZ   NOT NULL,

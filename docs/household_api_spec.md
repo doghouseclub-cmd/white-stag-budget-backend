@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Household API manages household creation, membership, joining, and household-level settings. All endpoints require Firebase authentication.
+The Household API manages household creation, membership, joining, and household-level settings. All endpoints require Supabase authentication.
 
 -----
 
@@ -13,7 +13,7 @@ The Household API manages household creation, membership, joining, and household
 ```
 /households/{householdId}
   ├── id: string (GUID, auto-generated)
-  ├── name: string (40-75 characters)
+  ├── name: string (2-75 characters)
   ├── createdAt: timestamp
   ├── createdBy: userId
   ├── members: array[userId]
@@ -29,7 +29,7 @@ The Household API manages household creation, membership, joining, and household
 
 ```
 /users/{userId}
-  ├── id: string (user UUID from Firebase)
+  ├── id: string (user UUID from Supabase Auth)
   ├── email: string (unique, lowercased)
   ├── name: string
   ├── householdId: string | null (pointer to household, null if not in one)
@@ -46,7 +46,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/create`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Request:**
 
@@ -78,7 +78,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Error Cases:**
 
-- `400`: Household name invalid (length not 40-75 chars)
+- `400`: Household name invalid (length not 2-75 chars)
 - `409`: User already in a household
 - `401`: Unauthenticated
 
@@ -88,7 +88,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/join`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Request:**
 
@@ -129,7 +129,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `GET /api/household`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Request:** No body
 
@@ -176,7 +176,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `GET /api/household/members`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Request:** No body
 
@@ -213,7 +213,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/members/remove`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Authorization:** Only household owner can remove members
 
@@ -247,7 +247,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/leave`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Request:** No body
 
@@ -272,7 +272,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/settings`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Authorization:** Only household owner can update settings
 
@@ -311,7 +311,7 @@ The Household API manages household creation, membership, joining, and household
 
 **Endpoint:** `POST /api/household/join-code/rotate`
 
-**Authentication:** Required (Firebase Auth)
+**Authentication:** Required (Supabase Auth)
 
 **Authorization:** Only household owner
 
@@ -334,37 +334,10 @@ The Household API manages household creation, membership, joining, and household
 
 |Field         |Min     |Max     |Notes                               |
 |--------------|--------|--------|------------------------------------|
-|householdName |40 chars|75 chars|Required, trimmed                   |
+|householdName |2 chars|75 chars|Required, trimmed                   |
 |joinCode      |6 chars |6 chars |Auto-generated, alphanumeric, unique|
 |currency      |-       |-       |ISO 4217 code (e.g., “USD”, “EUR”)  |
 |joinCodeExpiry|-       |2 days  |From creation timestamp             |
-
------
-
-## Firestore Security Rules
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // Households: Users can only read/write their own household
-    match /households/{householdId} {
-      allow read: if request.auth.uid in resource.data.members;
-      allow write: if request.auth.uid == resource.data.createdBy && 
-                      'members' in resource.data && 
-                      request.auth.uid in resource.data.members;
-    }
-    
-    // Users: Users can only read/write their own user doc
-    match /users/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow write: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
-    }
-  }
-}
-```
 
 -----
 
@@ -373,19 +346,19 @@ service cloud.firestore {
 ### Join Code Generation
 
 - 6 alphanumeric characters (A-Z, 0-9)
-- Uniqueness: Check before writing to Firestore
-- Expiry: `createdAt + 2 days` (48 hours)
+- Uniqueness: Check before inserting into `households.join_code`
+- Expiry: `created_at + 2 days` (48 hours)
 
 ### User Role Management
 
-- **Owner:** Can remove members, update settings, delete household (future)
-- **Member:** Can only leave household
+- **Owner:** Can create/delete household, invite members, remove members, and update settings.
+- **Member:** Can edit/approve the priority stack draft and leave the household.
 
 ### Household Lookup
 
-- Users are identified by email (lowercase)
-- Household is stored in user’s `householdId` field
-- Always validate user is in household before returning data
+- Users are identified by Supabase Auth UUID (`users.id` matches `auth.users.id`)
+- Household membership is stored in `users.household_id`
+- Always validate the caller is in the household before returning data
 
 -----
 

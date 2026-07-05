@@ -1,14 +1,15 @@
 // Mock Supabase Auth — supabase.auth.getUser resolves to a test user based on token string.
 const mockUsers = {
-  'owner-token':  { id: 'ws-ps-owner',  email: 'ps-owner@test.com',  user_metadata: { name: 'PS Owner' }  },
-  'member-token': { id: 'ws-ps-member', email: 'ps-member@test.com', user_metadata: { name: 'PS Member' } },
-  'bare-token':   { id: 'ws-ps-bare',   email: 'ps-bare@test.com',   user_metadata: { name: 'Bare User' } },
+  'owner-token':  { id: '00000000-0000-4000-8000-0000000000b1',  email: 'ps-owner@test.com',  user_metadata: { name: 'PS Owner' }  },
+  'member-token': { id: '00000000-0000-4000-8000-0000000000b2', email: 'ps-member@test.com', user_metadata: { name: 'PS Member' } },
+  'bare-token':   { id: '00000000-0000-4000-8000-0000000000b3',   email: 'ps-bare@test.com',   user_metadata: { name: 'Bare User' } },
 };
 
 jest.mock('../lib/supabase', () => {
   const actual = jest.requireActual('../lib/supabase');
   return {
     ...actual,
+    from: actual.from.bind(actual),
     auth: {
       ...actual.auth,
       getUser: jest.fn((token) => {
@@ -28,9 +29,9 @@ const { initializePriorityStack } = require('../routes/priority-stack');
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const OWNER_UID  = 'ws-ps-owner';
-const MEMBER_UID = 'ws-ps-member';
-const BARE_UID   = 'ws-ps-bare';
+const OWNER_UID  = '00000000-0000-4000-8000-0000000000b1';
+const MEMBER_UID = '00000000-0000-4000-8000-0000000000b2';
+const BARE_UID   = '00000000-0000-4000-8000-0000000000b3';
 
 const OWNER_TOKEN  = 'owner-token';
 const MEMBER_TOKEN = 'member-token';
